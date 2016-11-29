@@ -1,0 +1,47 @@
+module BankSystem
+{
+    struct Transaction
+    {
+        unsigned long transactionID;
+        long accountID;
+        boolean isDebit;
+        unsigned long amount;
+    };
+
+    struct Transfer
+    {
+        long src_bank_id;
+        long src_account_id;
+        long dest_bank_id;
+        long dest_account_id;
+        unsigned long amount;
+    };
+    
+    interface IBankTransaction
+    {
+        void do_transaction(in Transaction t);
+    };
+    
+    exception NoSuchClientException{};
+    
+    interface IBankCustomer
+    {
+        long create_account();
+        void close_account(in long account_id);
+        void deposit(in long account_id, in unsigned long amount);
+        void withdraw(in long account_id, in unsigned long amount);
+        long balance(in long account_id) raises( NoSuchClientException);
+        void transfer(in Transfer t);
+    };
+
+    interface Interbank
+    {
+        void register(in long bank_id, in IBankTransaction trans);
+        void confirm(in unsigned long transaction_id, in boolean failure);
+        void transfer_request(in Transfer t);
+    };
+
+    interface Bank : IBankTransaction, IBankCustomer
+    {
+    };
+};
