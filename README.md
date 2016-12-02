@@ -2,7 +2,10 @@
 
 ### Compilation:
 > make idl  
-> make
+> make  
+
+Les raisons de mon orientations vers le CORBA NotificationService  
+pp 35-36 et suivantes: https://www.scss.tcd.ie/publications/tech-reports/reports.99/TCD-CS-1999-34.pdf
 
 _______________
 OpenORB implementation (implementing NotificationService)  
