@@ -1,0 +1,8 @@
+
+module org {
+    module omg {
+        module CosNotifyChannelAdmin{
+            interface EventChannel {/*dummy declaration*/};
+        };
+    };
+};

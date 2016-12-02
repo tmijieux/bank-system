@@ -1,3 +1,5 @@
+#include "idl/CosNotifyChannelAdmin.idl"
+
 module BankSystem
 {
     struct Transaction
@@ -20,6 +22,7 @@ module BankSystem
     interface IBankTransaction
     {
         void do_transaction(in Transaction t);
+        void set_channel(in org::omg::CosNotifyChannelAdmin::EventChannel ec);
     };
     
     exception NoSuchClientException{};
