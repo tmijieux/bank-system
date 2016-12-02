@@ -22,14 +22,14 @@ public class BankServer {
 
         try {
             ORB orb = ORB.init(args, properties);
-            BankServant servant = new BankServant(orb, id, /*FIXME*/null); 
+            BankServant servant = new BankServant(orb, id, /*FIXME*/null);
             POA rootPOA = POAHelper.narrow(
                 orb.resolve_initial_references("RootPOA"));
             Policy[] persistentPolicy = new Policy[1];
             persistentPolicy[0] = rootPOA.create_lifespan_policy(
                 LifespanPolicyValue.PERSISTENT);
-            POA persistentPOA = rootPOA.create_POA("childPOA", null, 
-                                                   persistentPolicy ); 
+            POA persistentPOA = rootPOA.create_POA("childPOA", null,
+                                                   persistentPolicy );
             persistentPOA.the_POAManager().activate( );
             persistentPOA.activate_object( servant );
             org.omg.CORBA.Object obj;

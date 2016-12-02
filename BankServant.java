@@ -7,10 +7,13 @@ import BankSystem.Interbank;
 import BankSystem.IBankTransaction;
 import BankSystem.NoSuchClientException;
 
+import org.omg.CosNotification.*;
 import org.omg.CosNotifyChannelAdmin.*;
+import org.omg.CosNotifyComm.*;
 
 public class BankServant
     extends BankPOA
+    implements PushConsumerOperations
 {
     private ORB m_ORB;
     private HashMap<Integer, Client> m_clientMap;
@@ -18,6 +21,22 @@ public class BankServant
     private int m_lastClientId;
     private int m_bankID;
     private Interbank m_interBank;
+
+    public void offer_change(EventType et[], EventType et2[]) // PushConsumer
+    {
+        throw new org.omg.CORBA.NO_IMPLEMENT();
+    }
+
+    public void disconnect_push_consumer() // PushConsumer
+    {
+        throw new org.omg.CORBA.NO_IMPLEMENT();
+    }
+
+    public void push(org.omg.CORBA.Any event_any) // PushConsumer
+    {
+        System.out.println("[Bank" + m_bankID + "]  received 1 event (push)");
+        // Receive event here;
+    }
 
     public BankServant(ORB orb, int bank_id, Interbank ibank)
     {
@@ -29,11 +48,22 @@ public class BankServant
         m_interBank = ibank;
     }
 
-    public void set_channel(EventChannel ec)
+    public void set_channel(EventChannel chan) // IBankTransaction
     {
+        ProxyPushSupplier supp;
+        supp = NotificationServiceHelper.getPPushSupplier(chan);
+
+        try {
+            supp.connect_any_push_consumer((PushConsumer) this);
+        } catch (org.omg.CosEventChannelAdmin.AlreadyConnected ac) {
+            // fine ...
+        } catch (org.omg.CORBA.UserException e) {
+            e.printStackTrace();
+            System.exit(1);
+        }
     }
 
-    public int create_account()
+    public int create_account() // IBankCustomer
     {
         int id;
         synchronized(m_lastClientIdLock) {
@@ -43,7 +73,7 @@ public class BankServant
         return id;
     }
 
-    public void close_account(int account_id)
+    public void close_account(int account_id)  // IBankCustomer
     {
         Client client;
         client = m_clientMap.get(account_id);
@@ -52,7 +82,7 @@ public class BankServant
         client = null;
     }
 
-    public void deposit(int account_id, int amount)
+    public void deposit(int account_id, int amount)  // IBankCustomer
     {
         Client client;
         client = m_clientMap.get(account_id);
@@ -60,7 +90,7 @@ public class BankServant
             client.Deposit(amount);
     }
 
-    public void withdraw(int account_id, int amount)
+    public void withdraw(int account_id, int amount)  // IBankCustomer
     {
         Client client;
         client = m_clientMap.get(account_id);
@@ -68,7 +98,7 @@ public class BankServant
             client.Withdraw(amount);
     }
 
-    public int balance(int account_id)
+    public int balance(int account_id) // IBankCustomer
       throws NoSuchClientException
     {
         Client client;
@@ -79,7 +109,9 @@ public class BankServant
             throw new NoSuchClientException();
     }
 
-    public void do_transaction(Transaction t)
+    public void do_transaction(Transaction t) // IBankTransaction
+    /** this method WILL PROBABLY be removed later
+     */
     {
         Client client;
         client = m_clientMap.get(t.accountID);

@@ -15,17 +15,17 @@ public class InterbankServer {
         Properties properties = System.getProperties();
         properties.put( "org.omg.CORBA.ORBInitialHost", "localhost" );
         properties.put( "org.omg.CORBA.ORBInitialPort", "1050" );
-    
+
         try {
             ORB orb = ORB.init(args, properties);
-            InterbankServant servant = new InterbankServant(orb); 
+            InterbankServant servant = new InterbankServant(orb);
             POA rootPOA = POAHelper.narrow(
                 orb.resolve_initial_references("RootPOA"));
             Policy[] persistentPolicy = new Policy[1];
             persistentPolicy[0] = rootPOA.create_lifespan_policy(
                 LifespanPolicyValue.PERSISTENT);
-            POA persistentPOA = rootPOA.create_POA("childPOA", null, 
-                                                   persistentPolicy ); 
+            POA persistentPOA = rootPOA.create_POA("childPOA", null,
+                                                   persistentPolicy );
             persistentPOA.the_POAManager().activate( );
             persistentPOA.activate_object( servant );
             org.omg.CORBA.Object obj;
@@ -36,7 +36,7 @@ public class InterbankServer {
             nc = rootContext.to_name("InterbankServerTutorial");
             rootContext.rebind(nc, persistentPOA.servant_to_reference(servant));
             orb.run();
-        } catch ( Exception e ) {
+        } catch (Exception e) {
             System.err.println("Exception in Interbank Server Startup " + e);
         }
     }
