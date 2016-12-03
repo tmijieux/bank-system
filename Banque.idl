@@ -18,15 +18,21 @@ module BankSystem
         long dest_account_id;
         unsigned long amount;
     };
-    
+
+    struct TransferDate {
+        Transfer transfer;
+        long long date;
+    };
+    typedef sequence<TransferDate> TransferSequence;
+
     interface IBankTransaction
     {
         void do_transaction(in Transaction t);
         void set_channel(in org::omg::CosNotifyChannelAdmin::EventChannel ec);
     };
-    
+
     exception NoSuchClientException{};
-    
+
     interface IBankCustomer
     {
         long create_account();
@@ -42,9 +48,12 @@ module BankSystem
         void register(in long bank_id, in IBankTransaction trans);
         void confirm(in unsigned long transaction_id, in boolean failure);
         void transfer_request(in Transfer t);
+        TransferSequence get_transfer_log();
     };
 
     interface Bank : IBankTransaction, IBankCustomer
     {
     };
+
+
 };

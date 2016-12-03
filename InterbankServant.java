@@ -2,8 +2,10 @@ import org.omg.CORBA.ORB;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Date;
 import BankSystem.InterbankPOA;
 import BankSystem.Transfer;
+import BankSystem.TransferDate;
 import BankSystem.Transaction;
 import BankSystem.IBankTransaction;
 
@@ -31,7 +33,7 @@ public class InterbankServant
     private ORB m_ORB;
     private HashMap<Integer, PTransaction> m_transactionMap;
     private HashMap<Integer, BankProxy> m_bankMap;
-    private List<Transfer> m_transferLog;
+    private List<TransferDate> m_transferLog;
 
     private int m_lastTransactionId;
     private Object m_lastTransactionIdLock;
@@ -42,7 +44,7 @@ public class InterbankServant
         m_transactionMap = new HashMap<Integer, PTransaction>();
         m_bankMap = new HashMap<Integer, BankProxy>();
         m_lastTransactionIdLock = new Object();
-        m_transferLog = new LinkedList<Transfer>();
+        m_transferLog = new LinkedList<TransferDate>();
     }
 
     public void register(int bank_id, IBankTransaction trans)
@@ -64,7 +66,7 @@ public class InterbankServant
                 BankProxy src;
                 src = m_bankMap.get(t.src_bank_id);
                 if (src != null) {
-                    m_transferLog.add(t);
+                    m_transferLog.add(new TransferDate(t, new Date().getTime()));
                     Transaction trans;
                     trans = new Transaction(T.transactionID, t.src_bank_id,
                                             false, t.amount);
@@ -93,5 +95,10 @@ public class InterbankServant
             m_transactionMap.put(id, new PTransaction(trans, t));
             dst.sendTransaction(trans); // --> push event
         }
+    }
+
+    public TransferDate[] get_transfer_log()
+    {
+        return m_transferLog.toArray(new TransferDate[m_transferLog.size()]);
     }
 }
