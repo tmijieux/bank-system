@@ -2,20 +2,28 @@
 
 module BankSystem
 {
+    
+    enum TransactionType
+    {
+        DEBIT,
+        CREDIT
+    };
+    
     struct Transaction
     {
-        unsigned long transactionID;
-        long accountID;
-        boolean isDebit;
+        unsigned long id;
+        unsigned long bank_id;
+        unsigned long account_id;
         unsigned long amount;
+        TransactionType type;
     };
 
     struct Transfer
     {
-        long src_bank_id;
-        long src_account_id;
-        long dest_bank_id;
-        long dest_account_id;
+        unsigned long src_bank_id;
+        unsigned long src_account_id;
+        unsigned long dest_bank_id;
+        unsigned long dest_account_id;
         unsigned long amount;
     };
 
@@ -23,37 +31,43 @@ module BankSystem
         Transfer transfer;
         long long date;
     };
+    
     typedef sequence<TransferDate> TransferSequence;
 
-    interface IBankTransaction
+
+    typedef org::omg::CosNotifyChannelAdmin::EventChannel EventChannel;
+    interface Bank_IInterbank
     {
-        void do_transaction(in Transaction t);
-        void set_channel(in org::omg::CosNotifyChannelAdmin::EventChannel ec);
+        void set_channel(in EventChannel ec);
     };
 
-    exception NoSuchClientException{};
-
-    interface IBankCustomer
+    interface Account
+    {
+        void deposit(in unsigned long amount);
+        void withdraw(in unsigned long amount);
+        long get_balance();
+        void transfer(in unsigned long dst_bank_id,
+                      in unsigned long dst_account_id,
+                      in unsigned long amount);
+    };
+    
+    interface Bank_ICustomer
     {
         long create_account();
         void close_account(in long account_id);
-        void deposit(in long account_id, in unsigned long amount);
-        void withdraw(in long account_id, in unsigned long amount);
-        long balance(in long account_id) raises( NoSuchClientException);
-        void transfer(in Transfer t);
+        Account connect_account(in long account_id);
     };
 
     interface Interbank
     {
-        void register(in long bank_id, in IBankTransaction trans);
-        void confirm(in unsigned long transaction_id, in boolean failure);
-        void transfer_request(in Transfer t);
-        TransferSequence get_transfer_log();
+        void register(in long bank_id, in Bank_IInterbank bank_callback);
+        void confirm_transaction(
+            in unsigned long transaction_id, in boolean success);
+        void request_transfer(in Transfer t);
+        TransferSequence get_transfer_history();
     };
 
-    interface Bank : IBankTransaction, IBankCustomer
+    interface Bank : Bank_IInterbank, Bank_ICustomer
     {
     };
-
-
 };

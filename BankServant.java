@@ -1,129 +1,116 @@
-import org.omg.CORBA.ORB;
 import java.util.HashMap;
-import BankSystem.BankPOA;
-import BankSystem.Transaction;
-import BankSystem.Transfer;
-import BankSystem.Interbank;
-import BankSystem.IBankTransaction;
-import BankSystem.NoSuchClientException;
+import java.util.concurrent.ThreadLocalRandom;
 
+import BankSystem.*;
+
+import org.omg.CORBA.ORB;
+import org.omg.CORBA.Object;
+import org.omg.CORBA.Any;
+import org.omg.PortableServer.*;
 import org.omg.CosNotification.*;
 import org.omg.CosNotifyChannelAdmin.*;
 import org.omg.CosNotifyComm.*;
 
 public class BankServant
     extends BankPOA
-    implements PushConsumerOperations
 {
     private ORB m_ORB;
-    private HashMap<Integer, Client> m_clientMap;
-    private Object m_lastClientIdLock;
-    private int m_lastClientId;
-    private int m_bankID;
-    private Interbank m_interBank;
+    private POA m_POA;
+    private HashMap<Integer, Account> m_accountMap;
+    private java.lang.Object m_lastAccountIdLock;
+    private int m_lastAccountId;
+    private int m_bank_id;
+    private Interbank m_interbank;
+    private BankMailBox m_mail_box;
 
-    public void offer_change(EventType et[], EventType et2[]) // PushConsumer
-    {
-        throw new org.omg.CORBA.NO_IMPLEMENT();
-    }
-
-    public void disconnect_push_consumer() // PushConsumer
-    {
-        throw new org.omg.CORBA.NO_IMPLEMENT();
-    }
-
-    public void push(org.omg.CORBA.Any event_any) // PushConsumer
-    {
-        System.out.println("[Bank" + m_bankID + "]  received 1 event (push)");
-        // Receive event here;
-    }
-
-    public BankServant(ORB orb, int bank_id, Interbank ibank)
+    public BankServant(ORB orb, POA poa, int bank_id, Interbank interbank)
     {
         m_ORB = orb;
-        m_bankID = bank_id;
-        m_lastClientIdLock = new Object();
-        m_clientMap = new HashMap<Integer, Client>();
-        ibank.register(bank_id, (IBankTransaction) this);
-        m_interBank = ibank;
+        m_POA = poa;
+        m_bank_id = bank_id;
+        m_lastAccountIdLock = new java.lang.Object();
+        m_accountMap = new HashMap<Integer, Account>();
+
+        m_interbank = interbank;
+        m_interbank.register(m_bank_id, _this(orb));
+    }
+
+    public int get_id()
+    {
+        return m_bank_id;
     }
 
     public void set_channel(EventChannel chan) // IBankTransaction
     {
-        ProxyPushSupplier supp;
-        supp = NotificationServiceHelper.getPPushSupplier(chan);
-
-        try {
-            supp.connect_any_push_consumer((PushConsumer) this);
-        } catch (org.omg.CosEventChannelAdmin.AlreadyConnected ac) {
-            // fine ...
-        } catch (org.omg.CORBA.UserException e) {
-            e.printStackTrace();
-            System.exit(1);
-        }
+        m_mail_box = new BankMailBox(this, m_ORB, chan);
     }
 
     public int create_account() // IBankCustomer
     {
         int id;
-        synchronized(m_lastClientIdLock) {
-            id = m_lastClientId ++;
+        synchronized(m_lastAccountIdLock) {
+            id = m_lastAccountId ++;
         }
-        m_clientMap.put(id, new Client(0));
+
+        AccountServant ac_serv = new AccountServant(0, m_interbank, m_bank_id, id);
+        try {
+            m_POA.activate_object(ac_serv);
+            Object ac_ref = m_POA.servant_to_reference(ac_serv);
+            Account acc = AccountHelper.narrow(ac_ref);
+            m_accountMap.put(id, acc);
+        } catch (Exception e) {
+
+        }
         return id;
     }
 
-    public void close_account(int account_id)  // IBankCustomer
+    public Account connect_account(int account_id)
     {
-        Client client;
-        client = m_clientMap.get(account_id);
-        if (client != null)
-            m_clientMap.remove(client);
-        client = null;
+        return m_accountMap.get(account_id);
     }
 
-    public void deposit(int account_id, int amount)  // IBankCustomer
+    public void close_account(int account_id)  
     {
-        Client client;
-        client = m_clientMap.get(account_id);
-        if (client != null)
-            client.Deposit(amount);
+        Account account = m_accountMap.get(account_id);
+        if (account != null)
+            m_accountMap.remove(account);
+        // deactivate
+        account = null;
     }
 
-    public void withdraw(int account_id, int amount)  // IBankCustomer
+    private boolean deposit(int account_id, int amount)
     {
-        Client client;
-        client = m_clientMap.get(account_id);
-        if (client != null)
-            client.Withdraw(amount);
-    }
-
-    public int balance(int account_id) // IBankCustomer
-      throws NoSuchClientException
-    {
-        Client client;
-        client = m_clientMap.get(account_id);
-        if (client != null)
-            return client.GetBalance();
-        else
-            throw new NoSuchClientException();
-    }
-
-    public void do_transaction(Transaction t) // IBankTransaction
-    /** this method WILL PROBABLY be removed later
-     */
-    {
-        Client client;
-        client = m_clientMap.get(t.accountID);
-        if (client != null) {
-            if (t.isDebit)
-                client.Deposit(t.amount);
-            else
-                client.Withdraw(t.amount);
+        Account account;
+        account = m_accountMap.get(account_id);
+        if (account != null) {
+            account.deposit(amount);
+            return true;
         }
+        return false;
     }
 
-    public void transfer(Transfer t)
+    private boolean withdraw(int account_id, int amount)
     {
+        Account account;
+        account = m_accountMap.get(account_id);
+
+        if (account != null) {
+            account.withdraw(amount);
+            return true;
+        }
+        return false;
+    }
+
+    public void handleTransaction(Transaction T)
+    {
+        if (T.bank_id != m_bank_id)
+            return;
+
+        if (T.type == TransactionType.CREDIT)
+            this.withdraw(T.account_id, T.amount);
+        else if (T.type == TransactionType.DEBIT) {
+            boolean success = this.deposit(T.account_id, T.amount);
+            m_interbank.confirm_transaction(T.id, success);
+        }
     }
 }

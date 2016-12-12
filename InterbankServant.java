@@ -3,11 +3,8 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Date;
-import BankSystem.InterbankPOA;
-import BankSystem.Transfer;
-import BankSystem.TransferDate;
-import BankSystem.Transaction;
-import BankSystem.IBankTransaction;
+
+import BankSystem.*;
 
 import org.omg.CosNotification.*;
 import org.omg.CosNotifyChannelAdmin.*;
@@ -20,20 +17,20 @@ public class InterbankServant
     { /** this class's role is just to retain a transfer
        *  associated to a transaction before 'dst_bank'
        *  eventually confirm its transaction     */
-        public Transaction transac;
-        public Transfer transfer;
+        public Transaction T;
+        public Transfer    F;
 
-        public PTransaction(Transaction trc, Transfer trf)
+        public PTransaction(Transaction T, Transfer F)
         {
-            transac = trc;
-            transfer = trf;
+            this.T = T;
+            this.F = F;
         }
     }
 
     private ORB m_ORB;
     private HashMap<Integer, PTransaction> m_transactionMap;
     private HashMap<Integer, BankProxy> m_bankMap;
-    private List<TransferDate> m_transferLog;
+    private List<TransferDate> m_transferHistory;
 
     private int m_lastTransactionId;
     private Object m_lastTransactionIdLock;
@@ -44,61 +41,73 @@ public class InterbankServant
         m_transactionMap = new HashMap<Integer, PTransaction>();
         m_bankMap = new HashMap<Integer, BankProxy>();
         m_lastTransactionIdLock = new Object();
-        m_transferLog = new LinkedList<TransferDate>();
+        m_transferHistory = new LinkedList<TransferDate>();
     }
 
-    public void register(int bank_id, IBankTransaction trans)
+    public void register(int bank_id, Bank_IInterbank bank_callback)
     {
-        // if (m_bankMap.get(bank_id) == null)
-        m_bankMap.put(bank_id, new BankProxy(bank_id, trans, m_ORB));
+        m_bankMap.put(bank_id, new BankProxy(bank_id, bank_callback, m_ORB));
     }
 
-    public void confirm(int transaction_id, boolean failure)
+    private void addToHistory(Transfer F)
     {
-        PTransaction pTrans;
-        pTrans = m_transactionMap.get(transaction_id);
+        TransferDate TD = new TransferDate(F, new Date().getTime());
+        m_transferHistory.add(TD);
+    }
 
-        if (pTrans != null) {
-            Transaction T = pTrans.transac;
-            Transfer t = pTrans.transfer;
+    private void sendConfirmTransaction(
+        BankProxy bank, Transaction T, Transfer F)
+    {
+        Transaction CT;
+        CT = new Transaction(T.id, F.src_bank_id, F.src_account_id,
+                             F.amount, TransactionType.CREDIT);
+        bank.sendTransaction(CT);
+    }
 
-            if (T.isDebit) {
-                BankProxy src;
-                src = m_bankMap.get(t.src_bank_id);
+    public void confirm_transaction(int id, boolean failure)
+    {
+        PTransaction pt = m_transactionMap.get(id);
+
+        if (pt != null) {
+            Transaction T = pt.T;
+            Transfer    F = pt.F;
+
+            if (T.type == TransactionType.DEBIT) {
+                BankProxy src = m_bankMap.get(F.src_bank_id);
                 if (src != null) {
-                    m_transferLog.add(new TransferDate(t, new Date().getTime()));
-                    Transaction trans;
-                    trans = new Transaction(T.transactionID, t.src_bank_id,
-                                            false, t.amount);
-                    m_transactionMap.remove(pTrans);
-                    src.sendTransaction(trans);
+                    m_transactionMap.remove(pt);
+
+                    addToHistory(F);
+                    sendConfirmTransaction(src, T, F);
                 }
             } else
                 throw new RuntimeException(
-                    "BRUH: some bank try to confirm a transfer"+
-                    " which benefit to the very same bank");
+                    "BRUUHH: some bank try to confirm a transfer "+
+                    "which benefit to the very same bank. BAD BANK !!");
         }
     }
 
-    public void transfer_request(Transfer t)
+    public void request_transfer(Transfer F)
     {
         BankProxy dst;
-        dst = m_bankMap.get(t.dest_bank_id);
+        dst = m_bankMap.get(F.dest_bank_id);
         if (dst != null) {
             int id;
             synchronized(m_lastTransactionIdLock) {
                 id = m_lastTransactionId ++;
             }
 
-            Transaction trans;
-            trans = new Transaction(id, t.dest_bank_id, true, t.amount);
-            m_transactionMap.put(id, new PTransaction(trans, t));
-            dst.sendTransaction(trans); // --> push event
+            Transaction T;
+            T = new Transaction(id, F.dest_bank_id, F.dest_account_id,
+                                F.amount, TransactionType.DEBIT);
+            m_transactionMap.put(id, new PTransaction(T, F));
+            dst.sendTransaction(T);
         }
     }
 
-    public TransferDate[] get_transfer_log()
+    public TransferDate[] get_transfer_history()
     {
-        return m_transferLog.toArray(new TransferDate[m_transferLog.size()]);
+        return m_transferHistory.toArray(
+            new TransferDate[m_transferHistory.size()]);
     }
 }

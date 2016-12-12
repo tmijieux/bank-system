@@ -1,3 +1,5 @@
+import org.omg.CORBA.Object;
+import org.omg.CORBA.IntHolder;
 import org.omg.CosNotification.*;
 import org.omg.CosNotifyChannelAdmin.*;
 import org.omg.CosNotifyComm.*;
@@ -8,7 +10,7 @@ public final class NotificationServiceHelper
 
     public static EventChannel createChannel(org.omg.CORBA.ORB orb)
     {
-        org.omg.CORBA.Object chan_factory_ref = null;
+        Object chan_factory_ref = null;
         EventChannelFactory ev_chan_factory;
         try {
             chan_factory_ref =
@@ -19,9 +21,9 @@ public final class NotificationServiceHelper
         }
 
         ev_chan_factory = EventChannelFactoryHelper.narrow(chan_factory_ref);
-        org.omg.CORBA.IntHolder id = new org.omg.CORBA.IntHolder();
-        Property[] props = new Property[0];
-        EventChannel chan= null;
+        IntHolder    id    = new IntHolder();
+        Property[]   props = new Property[0];
+        EventChannel chan  = null;
         try {
             chan = ev_chan_factory.create_channel(props, props, id);
         } catch(Exception e) {
@@ -36,7 +38,7 @@ public final class NotificationServiceHelper
         SupplierAdmin supp_adm;
         supp_adm = chan.default_supplier_admin();
 
-        org.omg.CORBA.IntHolder supp_id = new org.omg.CORBA.IntHolder();
+        IntHolder supp_id = new IntHolder();
         ProxyConsumer generic_pconsumer = null;
         try {
             generic_pconsumer = supp_adm.obtain_notification_push_consumer(
@@ -53,7 +55,7 @@ public final class NotificationServiceHelper
         ConsumerAdmin consu_adm;
         consu_adm = chan.default_consumer_admin();
 
-        org.omg.CORBA.IntHolder consu_id = new org.omg.CORBA.IntHolder();
+        IntHolder consu_id = new IntHolder();
         ProxySupplier generic_psupplier = null;
         try {
             generic_psupplier = consu_adm.obtain_notification_push_supplier(
